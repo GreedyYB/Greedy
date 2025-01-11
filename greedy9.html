@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GREEDY!</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f9;
+            padding: 20px;
+        }
+        .game-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            display: inline-block;
+            width: 80%;
+            max-width: 600px;
+        }
+        h1 {
+            color: #008000;  /* A deep green color similar to dollar bill text */
+            font-family: 'Franklin Gothic', 'Arial Black', sans-serif;  /* Bold, blocky font */
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);  /* Slight shadow for depth */
+            font-weight: bold;
+        }
+        .progress-bar {
+            width: 100%;
+            background-color: #e0e0e0;
+            padding: 3px;
+            border-radius: 3px;
+            margin: 10px 0;
+            position: relative;
+        }
+        .progress-bar-fill {
+            display: block;
+            height: 22px;
+            border-radius: 3px;
+            transition: width 0.5s ease-in-out, background-color 0.5s ease-in-out;
+        }
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            left: 5%;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background-color: rgba(255, 0, 0, 0.5);
+        }
+        button {
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        #wagerStatus {
+            height: 40px;
+            margin: 10px 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #playAgainButton {
+            font-size: 18px;
+            padding: 15px 30px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #winBanner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 24px;
+            display: none;
+            animation: pulse 1s infinite alternate;
+        }
+        @keyframes pulse {
+            from { transform: translate(-50%, -50%) scale(1); }
+            to { transform: translate(-50%, -50%) scale(1.1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>GREEDY!</h1>
+        <div id="scoreboard">Player 1 Units: 200 | Player 2 Units: 200</div>
+        
+        <div class="progress-bar">
+            <div id="player1Progress" class="progress-bar-fill" style="width: 50%; background-color: #0000ff;"></div>
+        </div>
+        <div class="progress-bar">
+            <div id="player2Progress" class="progress-bar-fill" style="width: 50%; background-color: #0000ff;"></div>
+        </div>
+
+        <div>
+            <button id="player1WagerButton">Player 1 Wager</button>
+            <button id="player2WagerButton">Player 2 Wager</button>
+        </div>
+
+        <div id="wagerStatus"></div>
+        <div id="alertMessage"></div>
+        <div id="historyLog"></div>
+    </div>
+    <div id="winBanner"></div>
+
+    <!-- Audio element for click sound -->
+    <audio id="clickSound">
+        <source src="https://www.soundjay.com/buttons/sounds/button-16.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // Game state variables
+        let player1Units = 200;
+        let player2Units = 200;
+        let player1Wager = 0;
+        let player2Wager = 0;
+        const MIN_WAGER = 10;
+        let wagersPlaced = 0;
+
+        // DOM Elements
+        const scoreboard = document.getElementById('scoreboard');
+        const player1Progress = document.getElementById('player1Progress');
+        const player2Progress = document.getElementById('player2Progress');
+        const alertMessage = document.getElementById('alertMessage');
+        const historyLog = document.getElementById('historyLog');
+        const player1WagerButton = document.getElementById('player1WagerButton');
+        const player2WagerButton = document.getElementById('player2WagerButton');
+        const wagerStatus = document.getElementById('wagerStatus');
+        const winBanner = document.getElementById('winBanner');
+
+        // Play click sound
+        function playClickSound() {
+            clickSound.currentTime = 0; 
+           clickSound.play();
+       }
+
+       // Play game end sound
+       function playGameEndSound() {
+           const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+           
+           // Create oscillator
+           const oscillator = audioContext.createOscillator();
+           oscillator.type = 'sine';
+           oscillator.frequency.setValueAtTime(440, audioContext.currentTime); // A4 note
+           
+           // Create gain node for volume control
+           const gainNode = audioContext.createGain();
+           gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+           gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + .01);
+           gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + .5);
+           
+           // Connect nodes
+           oscillator.connect(gainNode);
+           gainNode.connect(audioContext.destination);
+           
+           // Start and stop the sound
+           oscillator.start();
+           oscillator.stop(audioContext.currentTime + .5);
+
+           // Play a second, higher pitched note after a short delay
+           setTimeout(() => {
+               const oscillator2 = audioContext.createOscillator();
+               oscillator2.type = 'sine';
+               oscillator2.frequency.setValueAtTime(660, audioContext.currentTime); // E5 note
+               
+               const gainNode2 = audioContext.createGain();
+               gainNode2.gain.setValueAtTime(0, audioContext.currentTime);
+               gainNode2.gain.linearRampToValueAtTime(1, audioContext.currentTime + .01);
+               gainNode2.gain.linearRampToValueAtTime(0, audioContext.currentTime + .5);
+               
+               oscillator2.connect(gainNode2);
+               gainNode2.connect(audioContext.destination);
+               
+               oscillator2.start();
+               oscillator2.stop(audioContext.currentTime + .5);
+           },250);
+       }
+
+       // Update game display
+       function updateDisplay() {
+           scoreboard.textContent = `Player ${player1Units} | Player ${player2Units}`;
+           updateProgressBar(player1Progress, player1Units);
+           updateProgressBar(player2Progress, player2Units);
+       }
+
+       function updateProgressBar(progressBar, units) {
+           const percentage = Math.min(100,(units /200) *50); // Cap at100%
+          progressBar.style.width= `${percentage}%`;
+          
+          // Calculate color (blue at200 red when lower green when higher)
+          const redComponent= units<200? Math.round((200-units)/200*255):0; 
+          const greenComponent= units>200? Math.round((units-200)/200*255):0; 
+          const blueComponent=Math.max(0 ,255-Math.abs(units-200)); 
+          progressBar.style.backgroundColor=`rgb(${redComponent},${greenComponent},${blueComponent})`; 
+      }
+
+      // Log game events
+      function logEvent(message) {
+          const logEntry=document.createElement('p'); 
+          logEntry.textContent= message; 
+          historyLog.prepend(logEntry); 
+      }
+
+      // Handle player wager
+      function handleWager(player) {
+          const currentUnits= player===1? player1Units : player2Units; 
+          const wager=parseInt(prompt(`Player ${player}, enter your wager (min ${MIN_WAGER}, max ${currentUnits}):`));
+
+          if(isNaN(wager)|| wager< MIN_WAGER || wager> currentUnits) { 
+              alert('Invalid wager. Try again.'); 
+              return; 
+          }
+
+          if(player===1) { 
+              player1Wager=wager; 
+              player1WagerButton.disabled=true; 
+          } else { 
+              player2Wager=wager; 
+              player2WagerButton.disabled=true; 
+          }
+
+          wagersPlaced++; 
+          wagerStatus.textContent=`Player ${player} has placed a wager. ${wagersPlaced===1? 'Waiting for other player.' : ''}`;
+
+          if(wagersPlaced===2) { 
+              setTimeout(resolveRound ,1000); // Delay to allow reading the status 
+          } 
+      }
+
+      // Resolve round
+      function resolveRound() { 
+          wagerStatus.textContent=''; // Clear wager status 
+          logEvent(`Player ${player1Wager} units.Player ${player2Wager} units.`);
+
+          if(player1Wager > player2Wager*2) { 
+              player1Units-=player1Wager; 
+              player2Units+=player1Wager; 
+              logEvent('Player wins the round! Player wagered more than200% of Player\'s wager.');
+         } else if(player2Wager > player1Wager*2) { 
+             player2Units-=player2Wager; 
+             player1Units+=player2Wager; 
+             logEvent('Player wins the round! Player wagered more than200% of Player\'s wager.');
+         } else if(player1Wager > player2Wager) { 
+             player1Units+=player2Wager; 
+             player2Units-=player2Wager; 
+             logEvent('Player wins the round!');
+         } else if(player2Wager > player1Wager) { 
+             player2Units+=player1Wager; 
+             player1Units-=player1Wager; 
+             logEvent('Player wins the round!');
+         } else { 
+             logEvent('Round is a draw!'); 
+         }
+
+         // Reset wagers and counter
+         player1Wager=0; 
+         player2Wager=0; 
+         wagersPlaced=0;
+
+         // Check game over conditions
+         if(player1Units<20) { endGame(2); } else if(player2Units<20) { endGame(1); } else { 
+
+             // Reset buttons and update display
+             player1WagerButton.disabled=false; 
+             player2WagerButton.disabled=false; 
+
+         }
+
+         updateDisplay(); 
+
+     }
+
+     // End game
+     function endGame(winner) { 
+
+         logEvent(`Player ${winner} wins the game!`); disableButtons(); 
+
+         wagerStatus.innerHTML='<button id="playAgainButton" onclick="startNewGame()">Thanks for playing! Push me to start a new game!</button>'; showWinBanner(winner); 
+
+         playGameEndSound(); 
+
+     }
+
+     // Show win banner
+     function showWinBanner(winner) { 
+
+         winBanner.textContent=`Player ${winner} Wins!`; winBanner.style.display='block'; setTimeout(() => { winBanner.style.display='none'; },5000);
+
+     }
+
+     // Disable buttons when game is over
+     function disableButtons() {
+
+         player1WagerButton.disabled=true; 
+
+         player2WagerButton.disabled=true;
+
+     }
+
+     // Start new game
+     function startNewGame() {
+
+         player1Units=200;
+
+         player2Units=200;
+
+         player1Wager=0;
+
+         player2Wager=0;
+
+         wagersPlaced=0;
+
+         player1WagerButton.disabled=false;
+
+         player2WagerButton.disabled=false;
+
+         wagerStatus.textContent='';
+
+         historyLog.innerHTML='';
+
+         updateDisplay();
+
+         logEvent('New game started!');
+
+     }
+
+     // Event Listeners
+
+     player1WagerButton.addEventListener('click', () => {
+
+         playClickSound();
+
+         handleWager(1);
+
+     });
+
+     player2WagerButton.addEventListener('click', () => {
+
+         playClickSound();
+
+         handleWager(2);
+
+     });
+
+     // Initial display update
+
+     updateDisplay();
+
+</script>
+</body>
+</html>
+
