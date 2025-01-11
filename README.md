@@ -1,0 +1,2 @@
+# Greedy
+GREEDY! wagering game
